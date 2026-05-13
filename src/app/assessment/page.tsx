@@ -1,0 +1,222 @@
+'use client';
+
+import { useState, useMemo, Suspense, useEffect } from "react";
+import { useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
+import { useUser, useFirestore, useCollection, useMemoFirebase, setDocumentNonBlocking, updateDocumentNonBlocking } from "@/firebase";
+import { doc, serverTimestamp, collection } from "firebase/firestore";
+import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
+import { Brain, Waves, Compass, HeartHandshake, ArrowLeft, CheckCircle2, Loader2, Lock } from "lucide-react";
+import Link from "next/link";
+import { format, addDays, isAfter } from "date-fns";
+import { cn, toSafeDate } from "@/lib/utils";
+
+function AssessmentContent() {
+  const router = useRouter();
+  const { user, isUserLoading, profile, isProfileLoading } = useUser();
+  const firestore = useFirestore();
+  const [loading, setLoading] = useState(false);
+  const [hasMounted, setHasMounted] = useState(false);
+
+  useEffect(() => {
+    setHasMounted(true);
+  }, []);
+
+  const [scores, setScores] = useState({
+    emotional: 1,
+    cognitive: 1,
+    motivation: 1,
+    relational: 1,
+  });
+
+  const assessmentsRef = useMemoFirebase(() => {
+    if (!firestore || !user) return null;
+    return collection(firestore, "users", user.uid, "assessments");
+  }, [firestore, user]);
+
+  const { data: assessments } = useCollection(assessmentsRef);
+
+  const type = profile?.isDay0Complete ? 'Day 14' : 'Day 0';
+  const isDay0Submitted = !!profile?.isDay0Complete;
+  const isDay14Submitted = !!(profile?.isDay0Complete && assessments?.find(a => a.type === 'Day 14'));
+
+  const unlockDate = useMemo(() => {
+    return toSafeDate(profile?.day14UnlockDate);
+  }, [profile]);
+
+  const searchParams = useSearchParams();
+  const hasOverride = searchParams.get('override') === 'jai';
+
+  const isDay14Locked = useMemo(() => {
+    if (!hasMounted) return true;
+    if (type === 'Day 0') return false;
+    if (process.env.NODE_ENV === 'development') return false;
+    if (hasOverride) return false;
+    if (!unlockDate) return true;
+    return !isAfter(new Date(), unlockDate);
+  }, [type, unlockDate, hasMounted, hasOverride]);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!user || !firestore) return;
+
+    if (type === 'Day 0' && isDay0Submitted) {
+      router.push("/dashboard");
+      return;
+    }
+
+    if (type === 'Day 14' && (isDay14Locked || isDay14Submitted)) {
+      router.push("/dashboard");
+      return;
+    }
+
+    setLoading(true);
+    const assessmentId = type.toLowerCase().replace(" ", "");
+    const assessmentRef = doc(firestore, "users", user.uid, "assessments", assessmentId);
+    const profileRef = doc(firestore, "users", user.uid);
+
+    setDocumentNonBlocking(assessmentRef, {
+      userId: user.uid,
+      type,
+      timestamp: serverTimestamp(),
+      ...scores
+    }, { merge: true });
+
+    if (type === 'Day 0') {
+      const highestDomain = Object.entries(scores).reduce((a, b) => a[1] > b[1] ? a : b)[0];
+      const isRelationalHighest = highestDomain === 'relational';
+
+      updateDocumentNonBlocking(profileRef, {
+        isDay0Complete: true,
+        day0CompletedAt: serverTimestamp(),
+        baselineDate: serverTimestamp(),
+        day14UnlockDate: (() => {
+          // Day 1 starts at 6 AM the morning after signup.
+          // Day 14 unlock = 13 days after Day 1 start = 6 AM on the 14th program day.
+          const day1Start = new Date();
+          day1Start.setDate(day1Start.getDate() + 1);
+          day1Start.setHours(6, 0, 0, 0);
+          return addDays(day1Start, 13);
+        })(),
+        isSubdomainComplete: !isRelationalHighest,
+        updatedAt: serverTimestamp()
+      });
+
+      if (isRelationalHighest) {
+        router.push("/subdomain");
+      } else {
+        router.push("/protocol");
+      }
+    } else {
+      updateDocumentNonBlocking(profileRef, {
+        isDay14AssessmentComplete: true,
+        updatedAt: serverTimestamp()
+      });
+      router.push("/exit");
+    }
+  };
+
+  const getButtonColor = (val: number, isSelected: boolean) => {
+    if (!isSelected) return "border-slate-100 text-muted-foreground hover:border-muted";
+    if (val >= 7) return "bg-red-500 border-red-500 text-white scale-110 shadow-lg";
+    if (val >= 4) return "bg-amber-500 border-amber-500 text-white scale-110 shadow-lg";
+    return "bg-emerald-500 border-emerald-500 text-white scale-110 shadow-lg";
+  };
+
+  const ScoreSelector = ({ domain, label, definition, icon: Icon, colorClass }: any) => {
+    const currentVal = scores[domain as keyof typeof scores];
+    return (
+      <div className="space-y-6 p-8 rounded-[2.5rem] bg-white border shadow-sm">
+        <div className="flex items-center gap-4">
+          <div className={`p-3 rounded-2xl ${colorClass}`}><Icon className="w-6 h-6" /></div>
+          <div className="space-y-1">
+            <Label className="text-xl font-bold font-headline block">{label}</Label>
+            <p className="text-xs text-muted-foreground font-medium">{definition}</p>
+          </div>
+        </div>
+        <div className="grid grid-cols-10 gap-1.5">
+          {Array.from({ length: 10 }, (_, i) => i + 1).map((val) => (
+            <button
+              key={val}
+              type="button"
+              onClick={() => setScores(prev => ({ ...prev, [domain]: val }))}
+              className={cn(
+                "h-12 rounded-xl text-sm font-black transition-all border-2",
+                getButtonColor(val, currentVal === val)
+              )}
+            >
+              {val}
+            </button>
+          ))}
+        </div>
+      </div>
+    );
+  };
+
+  if (isUserLoading || isProfileLoading || !hasMounted) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <Loader2 className="w-12 h-12 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  if (profile?.isDay0Complete && isDay14Locked && !isDay14Submitted) {
+    return (
+      <div className="min-h-screen bg-background p-6 flex items-center justify-center">
+        <div className="max-w-md w-full space-y-8 text-center">
+          <div className="w-20 h-20 bg-primary/10 rounded-3xl flex items-center justify-center text-primary mx-auto"><Lock className="w-10 h-10" /></div>
+          <div className="space-y-4">
+            <h1 className="text-3xl font-black font-headline">Assessment Locked</h1>
+            <p className="text-muted-foreground">Your baseline is immutable. Follow-up unlocks on <strong>{unlockDate ? format(unlockDate, 'd MMMM yyyy') : '5 April 2026'}</strong>.</p>
+          </div>
+          <Button asChild variant="outline" className="rounded-full px-8 h-12 font-bold"><Link href="/dashboard">Back to Dashboard</Link></Button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-background p-6 pb-24">
+      <div className="max-w-5xl mx-auto space-y-12">
+        <div className="flex items-center justify-between">
+          <Link href="/dashboard" className="text-xs font-black text-muted-foreground hover:text-primary transition-colors uppercase tracking-widest"><ArrowLeft className="w-4 h-4 mr-2 inline" /> Dashboard</Link>
+          <div className="flex items-center gap-4">
+            <Link href="/" className="w-10 h-10 bg-primary rounded-xl flex items-center justify-center text-primary-foreground font-bold">J</Link>
+          </div>
+        </div>
+
+        <div className="space-y-4">
+          <h1 className="text-5xl font-black font-headline tracking-tight">{type} Assessment</h1>
+          <p className="text-muted-foreground text-xl font-medium">Establish your current capacity across four key domains.</p>
+        </div>
+
+        <form onSubmit={handleSubmit} className="space-y-10">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+            <ScoreSelector domain="emotional" label="Emotional" definition="Manage internal stability and cortisol levels." icon={Waves} colorClass="bg-accent/40 text-accent-foreground" />
+            <ScoreSelector domain="cognitive" label="Cognitive" definition="Restore focus and manage cognitive load." icon={Brain} colorClass="bg-primary/20 text-primary" />
+            <ScoreSelector domain="motivation" label="Motivation" definition="Rebuild approach motivation and reward signals." icon={Compass} colorClass="bg-primary/20 text-primary" />
+            <ScoreSelector domain="relational" label="Relational" definition="Protect social energy and connection quality." icon={HeartHandshake} colorClass="bg-accent/40 text-accent-foreground" />
+          </div>
+          <Button size="lg" type="submit" className="w-full rounded-full h-16 font-black text-xl shadow-2xl shadow-primary/20" disabled={loading}>
+            {loading ? <Loader2 className="w-6 h-6 animate-spin mr-3" /> : <CheckCircle2 className="w-6 h-6 mr-3" />}
+            {type === 'Day 0' ? "Complete Baseline" : "Complete Follow-up"}
+          </Button>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+export default function AssessmentPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <Loader2 className="w-12 h-12 animate-spin text-primary" />
+      </div>
+    }>
+      <AssessmentContent />
+    </Suspense>
+  );
+}

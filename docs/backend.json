@@ -1,0 +1,162 @@
+{
+  "entities": {
+    "UserProfile": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "UserProfile",
+      "type": "object",
+      "description": "Represents a user's profile information, including entrance and exit survey data.",
+      "properties": {
+        "id": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "baselineDate": { "type": "string", "format": "date-time" },
+        "day14UnlockDate": { "type": "string", "format": "date-time" },
+        "isEntranceComplete": { "type": "boolean" },
+        "isDay0Complete": { "type": "boolean" },
+        "isExitComplete": { "type": "boolean" },
+        "isWeek1ReflectionComplete": { "type": "boolean" },
+        "isWeek2ReflectionComplete": { "type": "boolean" },
+        "entranceData": {
+          "type": "object",
+          "properties": {
+            "fullName": { "type": "string" },
+            "occupation": { "type": "string" },
+            "organisation": { "type": "string" },
+            "sector": { 
+              "type": "string", 
+              "enum": [
+                "Education", 
+                "Healthcare", 
+                "Social Care", 
+                "Charity & Non-profit", 
+                "Government & Public Sector", 
+                "Financial Services", 
+                "Legal", 
+                "Consulting", 
+                "Technology", 
+                "Marketing & Communications", 
+                "Retail & Hospitality", 
+                "Creative Industries", 
+                "Other"
+              ] 
+            },
+            "durationInRole": { "type": "string", "enum": ["Less than 1 year", "1–2 years", "3–5 years", "5+ years"] },
+            "workingHours": { "type": "string", "enum": ["Under 35hrs", "35–45hrs", "45–55hrs", "55hrs+"] },
+            "breaksPerDay": { "type": "string", "enum": ["0–1", "2–3", "4–5", "5+"] },
+            "planningTimeLossPerWeek": { "type": "string", "enum": ["0–1 times", "2–3 times", "3–5 times", "5+ times"] },
+            "taskParalysisPerWeek": { "type": "string", "enum": ["0–1 times", "2–3 times", "3–5 times", "5+ times"] },
+            "sustainabilityBefore": { "type": "number" },
+            "workloadFrictionPoints": {
+              "type": "array",
+              "items": { "type": "string" },
+              "minItems": 3,
+              "maxItems": 3
+            }
+          }
+        },
+        "exitData": {
+          "type": "object",
+          "properties": {
+            "experienceChangeScore": { "type": "number" },
+            "interventionUtilityScore": { "type": "number" },
+            "continueUsageLikelihood": { "type": "number" },
+            "workloadChange": { "type": "string" },
+            "impactfulPart": { "type": "string" },
+            "programmeChange": { "type": "string" },
+            "specificAnecdote": { "type": "string" },
+            "wantFullToolkit": { "type": "string", "enum": ["Yes", "No", "Maybe"] }
+          }
+        }
+      },
+      "required": ["id"]
+    },
+    "Assessment": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Assessment",
+      "type": "object",
+      "description": "Stores a user's self-assessment scores across four domains.",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "assessmentDate": { "type": "string", "format": "date-time" },
+        "type": { "type": "string", "enum": ["Day 0", "Day 14"] },
+        "emotional": { "type": "number" },
+        "cognitive": { "type": "number" },
+        "motivation": { "type": "number" },
+        "relational": { "type": "number" }
+      },
+      "required": ["id", "userId", "type", "emotional", "cognitive", "motivation", "relational"]
+    },
+    "Exercise": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Exercise",
+      "type": "object",
+      "description": "Defines a single burnout prevention exercise.",
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "domain": { "type": "string" },
+        "burnoutLevel": { "type": "string" },
+        "mechanism": { "type": "string" },
+        "instruction": { "type": "string" },
+        "timeRequired": { "type": "string" },
+        "whenToUse": { "type": "string" }
+      }
+    },
+    "ExerciseCompletion": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "ExerciseCompletion",
+      "type": "object",
+      "description": "Records an instance of a user completing a specific exercise.",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "exerciseId": { "type": "string" },
+        "exerciseName": { "type": "string" },
+        "domain": { "type": "string" },
+        "completionDate": { "type": "string", "format": "date-time" },
+        "usefulnessRating": { "type": "number" }
+      }
+    },
+    "WeeklyReflection": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "WeeklyReflection",
+      "type": "object",
+      "description": "A lightweight mid-pilot reflection completed at Day 7 or Day 14.",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "weeklyScore": { "type": "number" },
+        "biggestDrain": { "type": "string" },
+        "mostUsefulExercise": { "type": "string" },
+        "workNote": { "type": "string" },
+        "completedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "userId", "weeklyScore", "completedAt"]
+    }
+  },
+  "auth": {
+    "providers": ["password"]
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": { "$ref": "#/backend/entities/UserProfile" },
+      "description": "Stores individual user profiles."
+    },
+    "/users/{userId}/assessments/{assessmentId}": {
+      "schema": { "$ref": "#/backend/entities/Assessment" },
+      "description": "Stores a user's self-assessment scores."
+    },
+    "/exercises/{exerciseId}": {
+      "schema": { "$ref": "#/backend/entities/Exercise" },
+      "description": "Read-only library of burnout prevention exercises."
+    },
+    "/users/{userId}/exerciseCompletions/{completionId}": {
+      "schema": { "$ref": "#/backend/entities/ExerciseCompletion" },
+      "description": "Records instances of a user completing an exercise."
+    },
+    "/users/{userId}/reflections/{reflectionId}": {
+      "schema": { "$ref": "#/backend/entities/WeeklyReflection" },
+      "description": "Stores user weekly reflections (week1, week2)."
+    }
+  }
+}

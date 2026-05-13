@@ -1,0 +1,64 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isCoordinator() {
+      return isSignedIn() && request.auth.token.email == 'ryanthomaslee93@gmail.com';
+    }
+
+    // -----------------------------------------------------------------------
+    // meta/ — participant counter and other server-side metadata
+    // Any signed-in user may read/write so the new-profile transaction works.
+    // -----------------------------------------------------------------------
+    match /meta/{document} {
+      allow read, write: if isSignedIn();
+    }
+
+    // -----------------------------------------------------------------------
+    // users/ — participant profiles and all subcollections
+    // -----------------------------------------------------------------------
+    match /users/{userId} {
+      // Owner: full read + write on their own document
+      // Coordinator: full read + write for programme management (promote, backfill, etc.)
+      allow read:  if isOwner(userId) || isCoordinator();
+      allow write: if isOwner(userId) || isCoordinator();
+
+      match /assessments/{assessmentId} {
+        allow read, write: if isOwner(userId);
+        allow read:        if isCoordinator();
+      }
+
+      match /reflections/{reflectionId} {
+        allow read, write: if isOwner(userId);
+        allow read:        if isCoordinator();
+      }
+
+      match /exerciseCompletions/{completionId} {
+        allow read, write: if isOwner(userId);
+        allow read:        if isCoordinator();
+      }
+
+      // Telemetry events logged by the app (logEvent helper in telemetry.ts)
+      match /activity_logs/{logId} {
+        allow read, write: if isOwner(userId);
+        allow read:        if isCoordinator();
+      }
+    }
+
+    // -----------------------------------------------------------------------
+    // exercises/ — read-only reference data
+    // -----------------------------------------------------------------------
+    match /exercises/{exerciseId} {
+      allow read:  if true;
+      allow write: if false;
+    }
+  }
+}
