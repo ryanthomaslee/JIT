@@ -1,5 +1,10 @@
 # JAI Behavioural: Burnout Recovery & Assessment Platform (JIT)
 
+![Next.js](https://img.shields.io/badge/Next.js-15-black)
+![TypeScript](https://img.shields.io/badge/TypeScript-5-blue)
+![Firebase](https://img.shields.io/badge/Firebase-Backend-orange)
+![AI Powered](https://img.shields.io/badge/AI-Behavioural%20Insights-gold)
+
 ## Executive Summary
 
 This repository contains the frontend and backend codebase for the JAI Behavioural web platform.
