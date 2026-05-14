@@ -17,17 +17,17 @@ The platform demonstrates the intersection of organisational psychology and full
 
 ## Burnout Dashboard
 
-<p align="center">
-  <img src="./assets/jit-dashboard.png" alt="JIT Dashboard" width="1000"/>
-</p>
+<img width="652" height="565" alt="Screenshot 2026-05-14 at 09 24 39" src="https://github.com/user-attachments/assets/20ba11e8-8982-4f2a-a048-4501a5d44546" />
 
 ---
 
 ## Recovery Intervention Flow
 
-<p align="center">
-  <img src="./assets/jit-recovery-modal.png" alt="JIT Recovery Exercise Modal" width="1000"/>
-</p>
+<img width="1418" height="741" alt="Screenshot 2026-05-14 at 10 03 10" src="https://github.com/user-attachments/assets/a4625872-1965-49e4-adc7-5fef413ac1e6" />
+
+## NEUY Interaction
+
+<img width="369" height="437" alt="Screenshot 2026-05-14 at 10 04 25" src="https://github.com/user-attachments/assets/04322099-f4e7-4216-ab7b-aee0db90f8fa" />
 
 ---
 
