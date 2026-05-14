@@ -60,19 +60,27 @@ export function NEUYChat({ participantContext, targetDomain }: NEUYChatProps) {
       });
     }
     try {
+      // Anthropic requires messages to start with role 'user'; strip any leading assistant messages (e.g. the greeting).
+      const firstUserIdx = updatedMessages.findIndex(m => m.role === 'user');
+      const apiMessages = firstUserIdx >= 0 ? updatedMessages.slice(firstUserIdx) : updatedMessages;
+
       const response = await fetch('/api/neuy', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ messages: updatedMessages, participantContext }),
+        body: JSON.stringify({ messages: apiMessages, participantContext }),
       });
-      if (!response.ok) throw new Error('Failed to get response');
+      if (!response.ok) {
+        const body = await response.text().catch(() => '(unreadable)');
+        throw new Error(`HTTP ${response.status}: ${body}`);
+      }
       const data = await response.json();
       setMessages(prev => [...prev, { role: 'assistant', content: data.message }]);
     } catch (error) {
-      console.error('NEUY error:', error);
+      const msg = error instanceof Error ? error.message : String(error);
+      console.error('NEUY error:', msg);
       setMessages(prev => [...prev, {
         role: 'assistant',
-        content: "I'm having trouble connecting right now. Please try again in a moment."
+        content: `Connection error: ${msg}`
       }]);
     } finally {
       setIsLoading(false);

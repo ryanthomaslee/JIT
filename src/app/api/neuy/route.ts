@@ -63,11 +63,17 @@ export async function POST(request: NextRequest) {
       ? `${NEUY_SYSTEM_PROMPT}\n\nUSER CONTEXT:\n${participantContext}`
       : NEUY_SYSTEM_PROMPT;
 
+    // Anthropic requires messages to start with role 'user'.
+    const firstUserIdx = messages.findIndex((m: { role: string }) => m.role === 'user');
+    const apiMessages = firstUserIdx >= 0 ? messages.slice(firstUserIdx) : messages;
+
+    console.log('[NEUY] messages sent to Anthropic:\n', JSON.stringify(apiMessages, null, 2));
+
     const response = await anthropic.messages.create({
       model: 'claude-sonnet-4-6',
       max_tokens: 1024,
       system: systemWithContext,
-      messages: messages,
+      messages: apiMessages,
     });
 
     const content = response.content[0];
@@ -78,7 +84,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ message: content.text });
 
   } catch (error: any) {
-    console.error('NEUY API error:', error?.message || error);
+    console.error('[NEUY] API error:', error?.status, error?.message, error?.error ?? error);
     return NextResponse.json({ error: 'Failed to get response from NEUY' }, { status: 500 });
   }
 }
